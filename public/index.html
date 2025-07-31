@@ -1,56 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Upload to Drive</title>
+  <meta charset="UTF-8" />
+  <title>Drive Upload</title>
   <style>
-    body {
-      font-family: Arial;
-      max-width: 600px;
-      margin: 50px auto;
-      padding: 20px;
-    }
-    input[type="file"] {
-      margin-bottom: 15px;
-    }
-    .url-box {
-      margin-top: 20px;
-    }
+    body { font-family: Arial; padding: 2rem; background: #f9f9f9; }
+    input[type="file"] { margin-bottom: 1rem; }
+    #result { margin-top: 1rem; }
+    input[type="text"] { width: 80%; padding: 0.5rem; }
+    button { padding: 0.5rem 1rem; margin-left: 1rem; }
   </style>
 </head>
 <body>
-  <h2>Upload File to Google Drive</h2>
-  <form id="uploadForm">
-    <input type="file" name="file" required />
-    <button type="submit">Upload</button>
-  </form>
+  <h2>Upload to Google Drive</h2>
+  <input type="file" id="fileInput" />
+  <button onclick="upload()">Upload</button>
 
-  <div class="url-box" style="display:none">
-    <p>File URL:</p>
-    <input type="text" id="urlField" readonly style="width: 100%">
-    <button onclick="copyURL()">Copy Url</button>
+  <div id="result" style="display:none;">
+    <h3>File Link</h3>
+    <input type="text" id="urlBox" readonly />
+    <button onclick="copyLink()">Copy</button>
   </div>
 
   <script>
-    document.getElementById("uploadForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const file = e.target.file.files[0];
+    async function upload() {
+      const fileInput = document.getElementById("fileInput");
+      if (!fileInput.files.length) return alert("Please choose a file");
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", fileInput.files[0]);
+
       const res = await fetch("/api/upload", {
         method: "POST",
-        body: formData,
+        body: formData
       });
-      const data = await res.json();
-      document.querySelector(".url-box").style.display = "block";
-      document.getElementById("urlField").value = data.url;
-    });
 
-    function copyURL() {
-      const input = document.getElementById("urlField");
-      input.select();
+      const data = await res.json();
+      const urlBox = document.getElementById("urlBox");
+      urlBox.value = data.url;
+      document.getElementById("result").style.display = "block";
+    }
+
+    function copyLink() {
+      const urlBox = document.getElementById("urlBox");
+      urlBox.select();
       document.execCommand("copy");
-      alert("URL copied!");
     }
   </script>
 </body>

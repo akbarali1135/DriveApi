@@ -1,14 +1,13 @@
 {
+  "version": 2,
   "builds": [
     {
       "src": "api/upload.py",
       "use": "@vercel/python"
     }
   ],
-  "rewrites": [
-    {
-      "source": "/api/upload",
-      "destination": "/api/upload.py"
-    }
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/upload.py" },
+    { "src": "/(.*)", "dest": "/public/index.html" }
   ]
 }
