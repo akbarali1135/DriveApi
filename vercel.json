@@ -1,9 +1,14 @@
 {
   "builds": [
-    { "src": "api/upload.py", "use": "@vercel/python" }
+    {
+      "src": "api/upload.py",
+      "use": "@vercel/python"
+    }
   ],
   "rewrites": [
-    { "source": "/api/upload", "destination": "/api/upload.py" },
-    { "source": "/(.*)", "destination": "/public/index.html" }
-  ]
+    { "source": "/api/upload", "destination": "/api/upload.py" }
+  ],
+  "static": {
+    "public": "public"
+  }
 }
