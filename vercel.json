@@ -6,9 +6,9 @@
     }
   ],
   "rewrites": [
-    { "source": "/api/upload", "destination": "/api/upload.py" }
-  ],
-  "static": {
-    "public": "public"
-  }
+    {
+      "source": "/api/upload",
+      "destination": "/api/upload.py"
+    }
+  ]
 }
