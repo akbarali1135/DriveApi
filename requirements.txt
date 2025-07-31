@@ -4,7 +4,3 @@ uvicorn
 python-dotenv
 google-api-python-client
 google-auth
-traceback
-google-auth-oauthlib
-google-auth-httplib2
-google-cloud-storage
