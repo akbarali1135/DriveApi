@@ -1,10 +1,7 @@
-import os
-import io
-import json
-import uuid
 from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+import os, io, json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
@@ -12,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 app = FastAPI()
 
-# Allow frontend to call this
+# CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,39 +17,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize Google Drive client
-def get_drive_service():
-    info = json.loads(os.getenv("GOOGLE_SERVICE_ACCOUNT_RAW_JSON"))
+# Serve the frontend
+@app.get("/", response_class=HTMLResponse)
+async def home():
+    with open("api/index.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+# Upload endpoint
+@app.post("/api/upload")
+async def upload(file: UploadFile = File(...)):
+    creds = json.loads(os.getenv("GOOGLE_SERVICE_ACCOUNT_RAW_JSON"))
     credentials = service_account.Credentials.from_service_account_info(
-        info,
+        creds,
         scopes=["https://www.googleapis.com/auth/drive"]
     )
-    return build("drive", "v3", credentials=credentials)
+    drive = build("drive", "v3", credentials=credentials)
 
-@app.post("/api/upload")
-async def upload_to_drive(file: UploadFile = File(...)):
-    drive_service = get_drive_service()
-    file_metadata = {
-        "name": file.filename,
-    }
-    folder_id = os.getenv("DRIVE_FOLDER_ID")
-    if folder_id:
-        file_metadata["parents"] = [folder_id]
+    metadata = {"name": file.filename}
+    if os.getenv("DRIVE_FOLDER_ID"):
+        metadata["parents"] = [os.getenv("DRIVE_FOLDER_ID")]
 
     file_stream = io.BytesIO(await file.read())
-
-    uploaded = drive_service.files().create(
-        body=file_metadata,
+    uploaded = drive.files().create(
+        body=metadata,
         media_body=io.BytesIO(file_stream.getvalue()),
         media_mime_type=file.content_type,
         fields="id"
     ).execute()
 
-    # Make file public
-    drive_service.permissions().create(
+    drive.permissions().create(
         fileId=uploaded["id"],
-        body={"type": "anyone", "role": "reader"},
+        body={"type": "anyone", "role": "reader"}
     ).execute()
 
-    file_url = f"https://drive.google.com/file/d/{uploaded['id']}/view?usp=sharing"
-    return JSONResponse(content={"url": file_url})
+    return {"url": f"https://drive.google.com/file/d/{uploaded['id']}/view?usp=sharing"}
