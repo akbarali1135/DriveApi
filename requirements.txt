@@ -6,3 +6,6 @@ google-api-python-client>=2.102.0
 google-auth
 google-auth-httplib2
 google-auth-oauthlib
+google-auth-oauthlib>=1.0.0
+google-api-python-client>=2.0.0
+google-auth>=1.0.0
