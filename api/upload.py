@@ -7,9 +7,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
-
 app = FastAPI()
 
 # CORS settings
@@ -23,69 +21,64 @@ app.add_middleware(
 @app.get("/", response_class=HTMLResponse)
 async def home():
     try:
-        print("Serving index.html")
+        print("Serving index.html...")
         with open("api/index.html", "r", encoding="utf-8") as f:
             return f.read()
     except Exception as e:
-        print("Failed to serve index.html:", e)
-        return HTMLResponse(content="Error loading index.html", status_code=500)
+        print("Error loading homepage:", e)
+        return HTMLResponse("<h1>Error loading homepage</h1>", status_code=500)
 
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...)):
-    try:
-        print(f"Received file: {file.filename}, content type: {file.content_type}")
+    print("Received file:", file.filename)
 
-        # Load service account credentials
+    try:
         raw_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_RAW_JSON")
         if not raw_json:
-            print("Environment variable 'GOOGLE_SERVICE_ACCOUNT_RAW_JSON' is missing")
-            return JSONResponse(status_code=500, content={"error": "Missing credentials"})
+            raise ValueError("Missing GOOGLE_SERVICE_ACCOUNT_RAW_JSON in environment")
 
-        creds = json.loads(raw_json)
-        print("Loaded service account JSON successfully")
-
+        print("Parsing service account credentials...")
+        creds_dict = json.loads(raw_json)
         credentials = service_account.Credentials.from_service_account_info(
-            creds, scopes=["https://www.googleapis.com/auth/drive"]
+            creds_dict,
+            scopes=["https://www.googleapis.com/auth/drive"]
         )
-        print("Service account credentials created")
 
+        print("Building Drive API client...")
         drive = build("drive", "v3", credentials=credentials)
-        print("Google Drive client built successfully")
 
-        # Build file metadata
         metadata = {"name": file.filename}
         folder_id = os.getenv("DRIVE_FOLDER_ID")
         if folder_id:
             metadata["parents"] = [folder_id]
-            print(f"Using folder ID: {folder_id}")
-        else:
-            print("No folder ID specified. Uploading to root.")
+            print("Uploading to folder:", folder_id)
 
+        print("Reading file into memory...")
         file_stream = io.BytesIO(await file.read())
         media = MediaIoBaseUpload(file_stream, mimetype=file.content_type)
 
-        print("Starting file upload to Google Drive...")
+        print("Creating file on Google Drive...")
         uploaded = drive.files().create(
             body=metadata,
             media_body=media,
             fields="id"
         ).execute()
 
-        print(f"File uploaded successfully. File ID: {uploaded['id']}")
+        file_id = uploaded["id"]
+        print("File uploaded successfully. File ID:", file_id)
 
-        # Set file permission to public
-        print("Setting file permissions to 'anyone with link can read'")
+        print("Setting permissions...")
         drive.permissions().create(
-            fileId=uploaded["id"],
-            body={"type": "anyone", "role": "reader"},
+            fileId=file_id,
+            body={"type": "anyone", "role": "reader"}
         ).execute()
 
-        url = f"https://drive.google.com/file/d/{uploaded['id']}/view?usp=sharing"
-        print(f"File available at: {url}")
+        shareable_url = f"https://drive.google.com/file/d/{file_id}/view?usp=sharing"
+        print("Shareable URL:", shareable_url)
 
-        return {"url": url}
+        return {"url": shareable_url}
 
     except Exception as e:
-        print("Upload failed:", str(e))
+        print("❌ Upload failed:", e)
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"error": str(e)})
