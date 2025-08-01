@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os, io, json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
 from dotenv import load_dotenv
 import traceback
 
@@ -39,11 +40,12 @@ async def upload(file: UploadFile = File(...)):
         if os.getenv("DRIVE_FOLDER_ID"):
             metadata["parents"] = [os.getenv("DRIVE_FOLDER_ID")]
 
-        file_stream = io.BytesIO(await file.read())
+        file_stream = io.BytesIO(await file.read())  # Keep this
+        media = MediaIoBaseUpload(file_stream, mimetype=file.content_type)
+
         uploaded = drive.files().create(
             body=metadata,
-            media_body=io.BytesIO(file_stream.getvalue()),
-            media_mime_type=file.content_type,
+            media_body=media,
             fields="id"
         ).execute()
 
