@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 app = FastAPI()
 
-# CORS settings
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,65 +18,68 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Load credentials and build Drive client
+def get_drive_client():
+    try:
+        raw_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_RAW_JSON")
+        print("🔐 Loading service account credentials...")
+        creds = json.loads(raw_json)
+        credentials = service_account.Credentials.from_service_account_info(
+            creds, scopes=["https://www.googleapis.com/auth/drive"]
+        )
+        print("✅ Credentials loaded successfully.")
+        return build("drive", "v3", credentials=credentials)
+    except Exception as e:
+        print("❌ Error loading credentials:", e)
+        traceback.print_exc()
+        raise
+
+# Root endpoint to serve index.html (optional frontend)
 @app.get("/", response_class=HTMLResponse)
 async def home():
     try:
-        print("Serving index.html...")
         with open("api/index.html", "r", encoding="utf-8") as f:
             return f.read()
     except Exception as e:
-        print("Error loading homepage:", e)
-        return HTMLResponse("<h1>Error loading homepage</h1>", status_code=500)
+        return HTMLResponse(content=f"<h2>Error loading page: {e}</h2>", status_code=500)
 
+# File upload endpoint
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...)):
-    print("Received file:", file.filename)
-
     try:
-        raw_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_RAW_JSON")
-        if not raw_json:
-            raise ValueError("Missing GOOGLE_SERVICE_ACCOUNT_RAW_JSON in environment")
+        drive = get_drive_client()
 
-        print("Parsing service account credentials...")
-        creds_dict = json.loads(raw_json)
-        credentials = service_account.Credentials.from_service_account_info(
-            creds_dict,
-            scopes=["https://www.googleapis.com/auth/drive"]
-        )
-
-        print("Building Drive API client...")
-        drive = build("drive", "v3", credentials=credentials)
-
-        metadata = {"name": file.filename}
+        # Check folder access
         folder_id = os.getenv("DRIVE_FOLDER_ID")
+        print(f"📁 Checking access to folder ID: {folder_id}")
+        folder_check = drive.files().get(fileId=folder_id, fields="id, name").execute()
+        print(f"✅ Access confirmed for folder: {folder_check['name']}")
+
+        # Prepare file metadata
+        metadata = {"name": file.filename}
         if folder_id:
             metadata["parents"] = [folder_id]
-            print("Uploading to folder:", folder_id)
+        print(f"📤 Preparing to upload: {file.filename}")
 
-        print("Reading file into memory...")
+        # Read and upload file
         file_stream = io.BytesIO(await file.read())
         media = MediaIoBaseUpload(file_stream, mimetype=file.content_type)
-
-        print("Creating file on Google Drive...")
         uploaded = drive.files().create(
-            body=metadata,
-            media_body=media,
-            fields="id"
+            body=metadata, media_body=media, fields="id"
         ).execute()
+        print(f"✅ File uploaded with ID: {uploaded['id']}")
 
-        file_id = uploaded["id"]
-        print("File uploaded successfully. File ID:", file_id)
-
-        print("Setting permissions...")
+        # Make file public
         drive.permissions().create(
-            fileId=file_id,
-            body={"type": "anyone", "role": "reader"}
+            fileId=uploaded["id"],
+            body={"type": "anyone", "role": "reader"},
         ).execute()
+        print(f"🔗 Public permission granted.")
 
-        shareable_url = f"https://drive.google.com/file/d/{file_id}/view?usp=sharing"
-        print("Shareable URL:", shareable_url)
-
-        return {"url": shareable_url}
+        # Return shareable URL
+        file_url = f"https://drive.google.com/file/d/{uploaded['id']}/view?usp=sharing"
+        print(f"📎 Shareable link: {file_url}")
+        return {"url": file_url}
 
     except Exception as e:
         print("❌ Upload failed:", e)
