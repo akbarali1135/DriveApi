@@ -19,20 +19,21 @@ app.add_middleware(
 )
 
 # Load credentials and build Drive client
+
 def get_drive_client():
+    print("🔐 Loading service account credentials...")
+
+    # Fix: convert the JSON string to a Python dict
+    info_str = os.getenv("GOOGLE_SERVICE_ACCOUNT")
     try:
-        raw_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_RAW_JSON")
-        print("🔐 Loading service account credentials...")
-        creds = json.loads(raw_json)
-        credentials = service_account.Credentials.from_service_account_info(
-            creds, scopes=["https://www.googleapis.com/auth/drive"]
-        )
-        print("✅ Credentials loaded successfully.")
-        return build("drive", "v3", credentials=credentials)
+        info_dict = json.loads(info_str)
+        credentials = service_account.Credentials.from_service_account_info(info_dict)
     except Exception as e:
-        print("❌ Error loading credentials:", e)
-        traceback.print_exc()
+        print(f"❌ Error loading credentials: {e}")
         raise
+
+    service = build("drive", "v3", credentials=credentials)
+    return service
 
 # Root endpoint to serve index.html (optional frontend)
 @app.get("/", response_class=HTMLResponse)
