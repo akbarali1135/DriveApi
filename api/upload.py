@@ -44,9 +44,13 @@ async def upload(file: UploadFile = File(...)):
         creds = json.loads(raw_json)
         print("Loaded service account JSON successfully")
 
+        # 🔥 FIX: Convert the escaped newlines in the private key
+        creds["private_key"] = creds["private_key"].replace("\\n", "\n")
+
         credentials = service_account.Credentials.from_service_account_info(
             creds, scopes=["https://www.googleapis.com/auth/drive"]
         )
+
         print("Service account credentials created")
 
         drive = build("drive", "v3", credentials=credentials)
