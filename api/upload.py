@@ -6,6 +6,7 @@ import os, io, json, requests, traceback
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 
 # Load env variables
 load_dotenv()
@@ -55,8 +56,10 @@ async def upload(file: UploadFile = File(...)):
         print("Access token obtained")
 
         # Step 2: Build authorized Drive client
-        drive = build("drive", "v3", credentials=None, developerKey=None,
-                      requestBuilder=lambda *a, **k: Request(headers={"Authorization": f"Bearer {access_token}"}))
+
+        credentials = Credentials(token=access_token)
+        drive = build("drive", "v3", credentials=credentials)
+
 
         # Step 3: File metadata and upload
         metadata = {"name": file.filename}
